@@ -2,14 +2,14 @@ from scipy.spatial import Delaunay
 import numpy as np
 def sphere_triangulation(t_res, dl):
 	dt = np.pi/t_res
-	t_range=np.arange(0, np.pi + dt, dt)
+	t_range=np.arange(-np.pi/2, np.pi/2 + dt, dt)
 	points=[]
 	equivalents = []
 	for t in t_range:
-		if np.abs(np.sin(t))<0.00000001:
+		if np.abs(np.cos(t))<0.00000001:
 			f_range = [0]
 		else:
-			df = dl/np.sin(t)
+			df = dl/np.cos(t)
 			f_range = np.arange(0, 2*np.pi, df)
 		for f in f_range:
 			points.append([t, f])
