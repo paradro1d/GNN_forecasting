@@ -1,9 +1,11 @@
 from scipy.spatial import Delaunay
 import numpy as np
 
-def sphere_triangulation(t_res, dl):
-	#Creates graph for neural network
+def sphere_triangulation(t_res, l_res):
+	#Creates graph for neural network with resolution, equal to number
+	#of nodes on equators
 	dt = np.pi/t_res
+	dl = np.pi/l_res
 	t_range=np.arange(-np.pi/2, np.pi/2, dt)
 	t_range = np.append(t_range, np.pi/2)
 	points=[]
