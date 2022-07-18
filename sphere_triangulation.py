@@ -19,7 +19,7 @@ def sphere_triangulation(t_res, dl):
 		for f in f_range:
 			points.append([t, f])
 		equivalents.append([len(points)])
-	equivalents.pop().pop
+	equivalents.pop().pop()
 	
 	#Creating points for "gluing" the sphere along latitudes
 	cover_points = [[t, np.pi*2] for i, t in enumerate(np.array(t_range))]
