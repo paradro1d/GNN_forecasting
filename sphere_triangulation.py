@@ -31,7 +31,7 @@ def sphere_triangulation(t_res, l_res):
 	points = np.array(points)
 
 	#Triangulation process
-	tri = Delaunay(points, incremental=True)
+	tri = Delaunay(points)
 	simplices = tri.simplices
 	
 	#Gluing the sphere
