@@ -24,7 +24,7 @@ def build_net(network_structure: dict):
 class Gnn_basic(tf.keras.Model):
 	#Basic graph neural network model
 
-	def __init__(self, nn_params, loss_function, normalizer):
+	def __init__(self, nn_params):
 		#Initialization of model with given network parameters
 		super(Gnn_basic, self).__init__()
 		self.edge_encoder = build_net(nn_params['edge_encoder'])
@@ -32,13 +32,13 @@ class Gnn_basic(tf.keras.Model):
 		self.edge_processor = build_net(nn_params['edge_processor'])
 		self.node_processor = build_net(nn_params['node_processor'])
 		self.decoder = build_net(nn_params['decoder'])
-		self.loss_function = loss_function
-		self.normalizer = normalizer
 
-	def compile(self, optimizer):
+	def compile(self, optimizer, loss_function, normalizer):
 		#Model compilation
 		super(Gnn_basic, self).compile()
+		self.loss_function = loss_function
 		self.optimizer = optimizer
+		self.normalizer = normalizer
 		
 	@tf.function()
 	def call(self, batch):
@@ -75,6 +75,7 @@ class Gnn_basic(tf.keras.Model):
 		node_features_out = self.node_processor(tf.concat([node_features_out, 
 			tf.math.unsorted_segment_sum(edge_features, 
 				tf.gather(edges, 0), n)], axis=1))
+
 		#Decoding
 		node_features_out = self.decoder(node_features_out)
 		node_features_out = node_features + node_features_out
@@ -87,13 +88,13 @@ class Gnn_basic(tf.keras.Model):
 		edge_features = batch[1]
 		node_features = batch[2][0]
 		node_features_t1 = tf.cast(batch[2][1], tf.float32)
-		node_features_t1 = self.normalizer.normalize_nodes(node_features_true)
+		node_features_t1 = self.normalizer.normalize_nodes(node_features_t1)
 		node_features_t2 = tf.cast(batch[2][2], tf.float32)
-		node_features_t2 = self.normalizer.normalize_nodes(node_features_true)
+		node_features_t2 = self.normalizer.normalize_nodes(node_features_t2)
 		node_features_t3 = tf.cast(batch[2][3], tf.float32)
-		node_features_t3 = self.normalizer.normalize_nodes(node_features_true)
+		node_features_t3 = self.normalizer.normalize_nodes(node_features_t3)
 		node_features_t4 = tf.cast(batch[2][4], tf.float32)
-		node_features_t4 = self.normalizer.normalize_nodes(node_features_true)
+		node_features_t4 = self.normalizer.normalize_nodes(node_features_t4)
 
 
 		with tf.GradientTape() as tape:
@@ -123,12 +124,29 @@ class Gnn_basic(tf.keras.Model):
 
 	@tf.function()
 	def test_step(self, batch):
+		#Test step for evaluating performance
 		edges = batch[0]
 		edge_features = batch[1]
 		node_features = batch[2][0]
-		node_features_true = tf.cast(batch[2][1], tf.float32)
-		node_features_true = self.normalizer.normalize_nodes(node_features_true)
+		node_features_t1 = tf.cast(batch[2][1], tf.float32)
+		node_features_t1 = self.normalizer.normalize_nodes(node_features_t1)
+		node_features_t2 = tf.cast(batch[2][2], tf.float32)
+		node_features_t2 = self.normalizer.normalize_nodes(node_features_t2)
+		node_features_t3 = tf.cast(batch[2][3], tf.float32)
+		node_features_t3 = self.normalizer.normalize_nodes(node_features_t3)
+		node_features_t4 = tf.cast(batch[2][4], tf.float32)
+		node_features_t4 = self.normalizer.normalize_nodes(node_features_t4)
+		loss = 0
 		node_features_predicted = self.call((edges, node_features, edge_features))
-		node_features_predicted = self.normalizer.normalize_nodes(node_features_predicted)
-		loss = self.loss_function(node_features_predicted, node_features_true)
+		node_features_predicted_norm = self.normalizer.normalize_nodes(node_features_predicted)
+		loss += self.loss_function(node_features_predicted_norm, node_features_t1)
+		node_features_predicted = self.call((edges, node_features_predicted, edge_features))
+		node_features_predicted_norm = self.normalizer.normalize_nodes(node_features_predicted)
+		loss += self.loss_function(node_features_predicted_norm, node_features_t2)
+		node_features_predicted = self.call((edges, node_features_predicted, edge_features))
+		node_features_predicted_norm = self.normalizer.normalize_nodes(node_features_predicted)
+		loss += self.loss_function(node_features_predicted_norm, node_features_t3)
+		node_features_predicted = self.call((edges, node_features_predicted, edge_features))
+		node_features_predicted_norm = self.normalizer.normalize_nodes(node_features_predicted)
+		loss += self.loss_function(node_features_predicted_norm, node_features_t4)
 		return {'Loss':loss}
