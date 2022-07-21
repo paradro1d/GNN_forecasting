@@ -14,9 +14,17 @@ def load_tfrecords(nodes_features_file, edge_features_file, edges):
 
 	return nodes_ds, edge_feats_ds, edges_ds
 
-def zip_datasets(nodes_ds, edge_feats_ds, edges_ds, epochs_num):
+def zip_datasets(nodes_ds, edge_feats_ds, edges_ds):
 	#Preprocesses dataset for model input format
-	nodes_predictions = nodes_ds.skip(1)
-	nodes_ds = tf.data.Dataset.zip((nodes_ds, nodes_predictions)).repeat(epochs_num)
-	input_ds = tf.data.Dataset.zip((edges_ds, edge_feats_ds, nodes_ds)).batch(1).prefetch(AUTOTUNE)
+	ds_tup = (nodes_ds, nodes_ds.skip(1), nodes_ds.skip(2), 
+		nodes_ds.skip(3), nodes_ds.skip(4))
+	nodes_ds = tf.data.Dataset.zip(ds_tup)
+	filter_nan = lambda a, b, c, d, e: not tf.reduce_any(tf.math.is_nan(a))\
+		and not tf.reduce_any(tf.math.is_nan(b))\
+		and not tf.reduce_any(tf.math.is_nan(c))\
+		and not tf.reduce_any(tf.math.is_nan(d))\
+		and not tf.reduce_any(tf.math.is_nan(e))
+	nodes_ds = nodes_ds.filter(filter_nan)
+	input_ds = tf.data.Dataset.zip((edges_ds, edge_feats_ds,
+		 nodes_ds)).batch(1).prefetch(AUTOTUNE)
 	return input_ds
