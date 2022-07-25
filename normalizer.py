@@ -15,8 +15,10 @@ class Normalizer():
 
 		for batch in edge_dataset:
 			counter += tf.shape(batch)[0]*tf.shape(batch)[1]
+
 			self.edge_mean += tf.reduce_sum(batch, axis=[0, 1])
 			self.edge_std += tf.reduce_sum(batch**2, axis=[0, 1])
+
 			if counter >= self.max_accumulations:
 				break
 
@@ -25,7 +27,9 @@ class Normalizer():
 		self.edge_mean = self.edge_mean/counter
 		self.edge_std = self.edge_std/counter
 
-		self.edge_std = tf.reduce_max(tf.stack([tf.math.sqrt(self.edge_std - self.edge_mean**2), tf.fill(tf.shape(self.edge_std), self.std_epsilon)]), axis=0)
+		epsilon = tf.fill(tf.shape(self.edge_std), self.std_epsilon)
+		self.edge_std = tf.math.sqrt(self.edge_std - self.edge_mean**2)
+		self.edge_std = tf.reduce_max(tf.stack([self.edge_std, epsilon]), axis=0)
 
 		self.edge_mean = tf.cast(self.edge_mean, tf.float32)
 		self.edge_std = tf.cast(self.edge_std, tf.float32)
@@ -39,8 +43,10 @@ class Normalizer():
 
 		for batch in node_dataset:
 			counter += tf.shape(batch)[0]*tf.shape(batch)[1]
+
 			self.node_mean += tf.reduce_sum(batch, axis=[0, 1])
 			self.node_std += tf.reduce_sum(batch**2, axis=[0, 1])
+
 			if counter >= self.max_accumulations:
 				break
 
@@ -49,7 +55,9 @@ class Normalizer():
 		self.node_mean = self.node_mean/counter
 		self.node_std = self.node_std/counter
 
-		self.node_std = tf.reduce_max(tf.stack([tf.math.sqrt(self.node_std - self.node_mean**2), tf.fill(tf.shape(self.node_std), self.std_epsilon)]), axis=0)
+		epsilon = tf.fill(tf.shape(self.node_std), self.std_epsilon)
+		self.node_std = tf.math.sqrt(self.edge_std - self.edge_mean**2)
+		self.node_std = tf.reduce_max(tf.stack([self.node_std, epsilon]), axis=0)
 
 		self.node_mean = tf.cast(self.node_mean, tf.float32)
 		self.node_std = tf.cast(self.node_std, tf.float32)
