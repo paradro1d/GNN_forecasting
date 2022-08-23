@@ -69,14 +69,15 @@ class Gnn(tf.keras.Model):
             self.n_proc.append(tf.keras.models.load_model(path + '/n_proc' + str(i)))
             self.e_proc.append(tf.keras.models.load_model(path + '/e_proc' + str(i)))
 
-    def compile(self, optimizer, loss_function, normalizer):
+    def compile(self, optimizer, loss_function, normalizer, unnormalize=True):
         #Model compilation with given loss, optimizer and normalizer
         super(Gnn, self).compile()
+        self.unnormalize = unnormalize
         self.loss = loss_function
         self.optimizer = optimizer
         self.normalizer = normalizer
 
-    @tf.function(jit_compile=True)
+    @tf.function()
     def call(self, batch: tuple) -> tf.Tensor:
         #Model inference on batches
         edges = batch[0]
@@ -90,7 +91,10 @@ class Gnn(tf.keras.Model):
 
         n_feats = tf.map_fn(lambda x:self._call_unbatched(*x), 
                 (edges, n_feats, e_feats))[1]
-        return self.normalizer.unnormalize_nodes(n_feats)
+        if self.unnormalize:
+            return self.normalizer.unnormalize_nodes(n_feats)
+        else:
+            return n_feats
 
     def _call_unbatched(self, edges: tf.Tensor, n_feats: tf.Tensor, e_feats: tf.Tensor) -> tuple:
     #Model inference on data in unbatched format
@@ -141,7 +145,7 @@ class Forecaster(Gnn):
     Takes data for training in the next format:
     (<edges>, <edge features>, (<consequent states for prediction>), <const node feats>)
     '''
-    @tf.function(jit_compile=True)
+    @tf.function()
     def train_step(self, batch: tuple):
     #Training step
 
@@ -185,7 +189,7 @@ class Forecaster(Gnn):
         self.optimizer.apply_gradients(zip(grads, trainable_variables))
         return loss_dict
 
-    @tf.function(jit_compile=True)
+    @tf.function()
     def test_step(self, batch: tuple):
         #Test step for evaluating performance
 
@@ -198,7 +202,7 @@ class Forecaster(Gnn):
 
         #Calculating multi-step loss
         loss = 0
-        pred = super().call((edges, n_feats, e_feats, const_feats))
+        pred = super((edges, n_feats, e_feats, const_feats))
         pred_norm = self.normalizer.normalize_nodes(pred)
 
         for step in batch[2][1:-1]:
@@ -222,12 +226,11 @@ class Forecaster(Gnn):
         return loss_dict
 
 
-############################################################################################
-def Interpolator(Gnn):
+class Remesher(Gnn):
     '''
-    Class for training a neural network for interpolation.
+    Class for training a neural network for mesh adoption.
     Takes data for training in the next format:
-    (<edges>, <edge features>, (<corrupted data>, <ground truth>))
+    (<edges>, <edge features>, <node features>, <target>))
     '''
     @tf.function()
     def train_step(self, batch):
@@ -236,14 +239,14 @@ def Interpolator(Gnn):
     #Reading input
         edges = batch[0]
         e_feats = batch[1]
-        n_feats = batch[2][0]
-        n_true = batch[2][1]
+        n_feats = batch[2]
+        target = batch[3]
+        reg_n = tf.shape(target)[1]
+        const_features = tf.zeros((tf.shape(n_feats)[0], tf.shape(n_feats)[1], 0))
 
         with tf.GradientTape() as tape:
-            pred = self.call((edges, n_feats, e_feats))
-            pred_norm = self.normalizer.normalize_nodes(pred)
-            n_true = self.normalizer.normalize_nodes(n_true)
-            loss = self.loss(pred_norm, n_true)
+            pred = super().call((edges, n_feats, e_feats, const_features))
+            loss = self.loss(target, pred[:, :reg_n])
 
         #Calculating and applying gradients
         trainable_variables = sum([i.trainable_variables for i in self.n_proc + self.e_proc], [])
@@ -263,11 +266,11 @@ def Interpolator(Gnn):
         edges = batch[0]
         e_feats = batch[1]
         n_feats = batch[2][0]
-        n_true = batch[2][1]
+        target = batch[3]
+        reg_n = tf.shape(target)[1]
+        const_features = tf.zeros((tf.shape(n_feats)[0], tf.shape(n_feats)[1], 0))
 
-        pred = self.call((edges, n_feats, e_feats))
-        pred_norm = self.normalizer.normalize_nodes(pred)
-        n_true = self.normalizer.normalize_nodes(n_true)
+        pred = self.call((edges, n_feats, e_feats, const_features))
         loss = self.loss(pred_norm, n_true)
 
         return {'Loss': loss}
